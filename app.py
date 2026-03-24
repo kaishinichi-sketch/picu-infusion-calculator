@@ -1,5 +1,8 @@
 import streamlit as st
 import pandas as pd
+from PIL import Image
+logo = Image.open("logo.png")
+st.image(logo, width=140)
 
 # Load your Excel data
 file_path = "PICU_Infusion_Calculator.xlsx"
@@ -20,6 +23,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("PICU Infusion Calculator")
+st.markdown("**Created by: Katherine Casandra Sta. Ana, RN, MSN**")
 st.write("Clinical Mode • Auto‑Fill Enabled")
 
 # User Inputs
@@ -97,3 +101,11 @@ st.write(selected["Special consideration"])
 
 st.subheader("Average Starting Dose")
 st.write(selected["Average starting dose (Dose range)"])
+st.markdown("---")
+st.markdown("""
+<div style='text-align: center; font-size: 13px; color: #555;'>
+Drug data and preparation standards used in this application are derived from the
+<b>Standardized Pediatric and Neonatal IV Drips List for Commonly Used Medications</b>,
+issued by King Saud University Medical City (KSUMC), Department of Pharmacy Services – Pharmacy Practice Council.
+</div>
+""", unsafe_allow_html=True)
