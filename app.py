@@ -28,12 +28,9 @@ st.markdown(
 st.markdown("---")
 
 # ---------------------------------------------------------
-# LOAD FORMULARY FROM EXCEL (uploaded document)
+# LOAD FORMULARY (from your Excel structure)
 # ---------------------------------------------------------
-# You will replace this with: pd.read_excel("PICU_Infusion_Calculator.xlsx")
-# For now, we reconstruct a dataframe from your uploaded file content.
-
-formulary_data = {
+formulary = pd.DataFrame({
     "Drug": [
         "Epinephrine (1mg/mL) 1mL",
         "Norepinephrine (1mg/mL) 4mL",
@@ -54,10 +51,14 @@ formulary_data = {
         "mg/kg/hr", "mcg/kg/hr", "mcg/kg/min", "mcg/kg/min",
         "mcg/kg/min", "mcg/kg/hr", "mg/kg/hr", "unit/kg/hr", "unit/kg/hr"
     ],
-    "StockConc": [1, 4, 200, 250, 100, 0.5, 15, 500, 20, 0.2, 20, 5000, 1000]
-}
-
-df = pd.DataFrame(formulary_data)
+    "StockConc": [1, 4, 200, 250, 100, 0.5, 15, 500, 20, 0.2, 20, 5000, 1000],
+    "Std_Final_mL": [50, 50, 50, 50, 50, 50, 30, 50, 50, 50, 50, 50, 50],
+    "Std_Diluent": [
+        "D5NS/D5W/½NS", "D5NS/D5W/½NS", "D5W/D10W/NS", "D5W/D10W/NS",
+        "D5W/NS", "D5W/NS", "D5W/NS", "D5W/NS", "D5W/NS",
+        "NS", "D5W/NS", "D5W/NS", "NS"
+    ]
+})
 
 # ---------------------------------------------------------
 # INPUT PANEL
@@ -66,69 +67,86 @@ st.subheader("Enter Patient & Infusion Details")
 
 with st.container():
     st.markdown(
-        "<div style='padding:15px; border:2px solid #4A90E2; border-radius:10px;'>",
+        "<div style='padding:15px; border:2px solid #4A90E2; border-radius:10px; background:#F0F8FF;'>",
         unsafe_allow_html=True
     )
 
     weight = st.number_input("Weight (kg)", min_value=0.1, step=0.1)
 
-    drug = st.selectbox(
-        "Select Drug",
-        df["Drug"].tolist()
-    )
+    drug = st.selectbox("Select Drug", formulary["Drug"].tolist())
 
     dose = st.number_input("Ordered Dose", min_value=0.0, step=0.01)
 
     st.markdown("</div>", unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# DRUG DETAILS (scrollable)
+# DRUG INFO (scrollable)
 # ---------------------------------------------------------
-st.subheader("Drug Information")
+st.subheader("Drug Formulary")
 
-with st.expander("View Drug Formulary (scrollable)"):
-    st.dataframe(df, height=250)
+with st.expander("View Drug List"):
+    st.dataframe(formulary, height=250)
 
 # ---------------------------------------------------------
-# CALCULATION
+# CALCULATION ENGINE
 # ---------------------------------------------------------
-def calculate_rate(weight, dose, stock_conc, dose_unit):
-    """
-    Simplified universal formula:
-    Converts dose → mg/min → mL/hr
-    """
-    # Convert dose units
+def calculate_infusion(weight, dose, stock_conc, dose_unit, final_volume):
+    # Convert dose to mg/min
     if "mcg" in dose_unit:
-        mg_per_kg_per_min = dose / 1000
-        mg_per_min = mg_per_kg_per_min * weight
+        mg_per_min = (dose / 1000) * weight
     elif "mg" in dose_unit:
         mg_per_min = (dose * weight) / 60
     elif "unit" in dose_unit:
-        mg_per_min = dose * weight  # placeholder for unit-based drugs
+        mg_per_min = dose * weight  # placeholder
     else:
         return None
 
     mL_per_min = mg_per_min / stock_conc
     mL_per_hr = mL_per_min * 60
-    return mL_per_hr
+
+    # Amount to draw
+    amount_mg = stock_conc * final_volume
+    stock_to_draw = amount_mg / stock_conc
+
+    return mL_per_hr, stock_to_draw
 
 # ---------------------------------------------------------
-# RESULTS PANEL
+# RESULTS PANEL (Excel‑style)
 # ---------------------------------------------------------
 st.markdown("---")
-st.subheader("Results")
+st.subheader("Infusion Preparation Sheet")
 
-if st.button("Calculate Infusion Rate"):
-    row = df[df["Drug"] == drug].iloc[0]
-    stock_conc = row["StockConc"]
+if st.button("Generate Calculation Sheet"):
+    row = formulary[formulary["Drug"] == drug].iloc[0]
+
+    stock = row["StockConc"]
     dose_unit = row["Dose_Unit"]
+    final_vol = row["Std_Final_mL"]
+    diluent = row["Std_Diluent"]
 
-    rate = calculate_rate(weight, dose, stock_conc, dose_unit)
+    rate, stock_draw = calculate_infusion(weight, dose, stock, dose_unit, final_vol)
 
-    if rate:
-        st.success(f"**Infusion Rate:** {rate:.2f} mL/hr")
-    else:
-        st.error("Unable to calculate. Check inputs.")
+    st.markdown(
+        """
+        <div style='padding:20px; border:2px solid #2E8B57; border-radius:10px; background:#FAFFFA;'>
+        <h3 style='color:#2E8B57;'>Infusion Preparation Summary</h3>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.write(f"**Drug:** {drug}")
+    st.write(f"**Weight:** {weight} kg")
+    st.write(f"**Ordered Dose:** {dose} {dose_unit}")
+    st.write(f"**Stock Concentration:** {stock} mg/mL")
+    st.write(f"**Standard Final Volume:** {final_vol} mL")
+    st.write(f"**Diluent:** {diluent}")
+
+    st.markdown("---")
+
+    st.success(f"**Infusion Rate:** {rate:.2f} mL/hr")
+    st.info(f"**Stock to Draw:** {stock_draw:.2f} mL")
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
 # ---------------------------------------------------------
 # DISCLAIMER + ATTRIBUTION
@@ -138,10 +156,10 @@ st.markdown("---")
 st.markdown(
     """
     <div style='font-size:13px; color:gray;'>
-    <strong>Disclaimer:</strong>  
-    Drug data and preparation standards used in this application are derived from the 
-    <em>Standardized Pediatric and Neonatal IV Drips List for Commonly Used Medications</em>,  
-    issued by <strong>King Saud University Medical City (KSUMC), Department of Pharmacy Services – Pharmacy Practice Council</strong>.  
+    <strong>Disclaimer:</strong><br>
+    Drug data and preparation standards used in this application are derived from the
+    <em>Standardized Pediatric and Neonatal IV Drips List for Commonly Used Medications</em>,
+    issued by <strong>King Saud University Medical City (KSUMC), Department of Pharmacy Services – Pharmacy Practice Council</strong>.
     <br><br>
     This tool is for educational support only and must not replace clinical judgment.
     <br><br>
