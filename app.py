@@ -28,7 +28,7 @@ st.markdown(
 st.markdown("---")
 
 # ---------------------------------------------------------
-# LOAD FORMULARY (from your Excel structure)
+# LOAD FORMULARY
 # ---------------------------------------------------------
 formulary = pd.DataFrame({
     "Drug": [
@@ -51,13 +51,7 @@ formulary = pd.DataFrame({
         "mg/kg/hr", "mcg/kg/hr", "mcg/kg/min", "mcg/kg/min",
         "mcg/kg/min", "mcg/kg/hr", "mg/kg/hr", "unit/kg/hr", "unit/kg/hr"
     ],
-    "StockConc": [1, 4, 200, 250, 100, 0.5, 15, 500, 20, 0.2, 20, 5000, 1000],
-    "Std_Final_mL": [50, 50, 50, 50, 50, 50, 30, 50, 50, 50, 50, 50, 50],
-    "Std_Diluent": [
-        "D5NS/D5W/½NS", "D5NS/D5W/½NS", "D5W/D10W/NS", "D5W/D10W/NS",
-        "D5W/NS", "D5W/NS", "D5W/NS", "D5W/NS", "D5W/NS",
-        "NS", "D5W/NS", "D5W/NS", "NS"
-    ]
+    "StockConc": [1, 4, 200, 250, 100, 0.5, 15, 500, 20, 0.2, 20, 5000, 1000]
 })
 
 # ---------------------------------------------------------
@@ -80,73 +74,41 @@ with st.container():
     st.markdown("</div>", unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# DRUG INFO (scrollable)
-# ---------------------------------------------------------
-st.subheader("Drug Formulary")
-
-with st.expander("View Drug List"):
-    st.dataframe(formulary, height=250)
-
-# ---------------------------------------------------------
 # CALCULATION ENGINE
 # ---------------------------------------------------------
-def calculate_infusion(weight, dose, stock_conc, dose_unit, final_volume):
-    # Convert dose to mg/min
+def calculate_rate(weight, dose, stock_conc, dose_unit):
     if "mcg" in dose_unit:
         mg_per_min = (dose / 1000) * weight
     elif "mg" in dose_unit:
         mg_per_min = (dose * weight) / 60
     elif "unit" in dose_unit:
-        mg_per_min = dose * weight  # placeholder
+        mg_per_min = dose * weight
     else:
         return None
 
     mL_per_min = mg_per_min / stock_conc
     mL_per_hr = mL_per_min * 60
-
-    # Amount to draw
-    amount_mg = stock_conc * final_volume
-    stock_to_draw = amount_mg / stock_conc
-
-    return mL_per_hr, stock_to_draw
+    return mL_per_hr
 
 # ---------------------------------------------------------
-# RESULTS PANEL (Excel‑style)
+# IMMEDIATE OUTPUT
 # ---------------------------------------------------------
 st.markdown("---")
-st.subheader("Infusion Preparation Sheet")
+st.subheader("Result")
 
-if st.button("Generate Calculation Sheet"):
+if weight > 0 and dose > 0:
     row = formulary[formulary["Drug"] == drug].iloc[0]
-
     stock = row["StockConc"]
     dose_unit = row["Dose_Unit"]
-    final_vol = row["Std_Final_mL"]
-    diluent = row["Std_Diluent"]
 
-    rate, stock_draw = calculate_infusion(weight, dose, stock, dose_unit, final_vol)
+    rate = calculate_rate(weight, dose, stock, dose_unit)
 
-    st.markdown(
-        """
-        <div style='padding:20px; border:2px solid #2E8B57; border-radius:10px; background:#FAFFFA;'>
-        <h3 style='color:#2E8B57;'>Infusion Preparation Summary</h3>
-        """,
-        unsafe_allow_html=True
-    )
-
-    st.write(f"**Drug:** {drug}")
-    st.write(f"**Weight:** {weight} kg")
-    st.write(f"**Ordered Dose:** {dose} {dose_unit}")
-    st.write(f"**Stock Concentration:** {stock} mg/mL")
-    st.write(f"**Standard Final Volume:** {final_vol} mL")
-    st.write(f"**Diluent:** {diluent}")
-
-    st.markdown("---")
-
-    st.success(f"**Infusion Rate:** {rate:.2f} mL/hr")
-    st.info(f"**Stock to Draw:** {stock_draw:.2f} mL")
-
-    st.markdown("</div>", unsafe_allow_html=True)
+    if rate:
+        st.success(f"**Infusion Rate:** {rate:.2f} mL/hr")
+    else:
+        st.error("Unable to calculate. Check inputs.")
+else:
+    st.info("Enter weight and dose to see the result.")
 
 # ---------------------------------------------------------
 # DISCLAIMER + ATTRIBUTION
